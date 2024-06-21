@@ -25,21 +25,23 @@ const LinkList = () => {
         return images[randomIndex];
     };
 
-    useEffect(() => {
-        const fetchLinks = async () => {
-            try {
-                const response = await axios.get('http://localhost:5000/api/urls');
-                console.log('API Response:', response.data);
-                const data = response.data.data;
-                if (Array.isArray(data)) {
-                    setLinks(data);
-                } else {
-                    console.error('Fetched data is not an array', response.data);
-                }
-            } catch (error) {
-                console.error('Error fetching links', error);
+    const fetchLinks = async () => {
+        try {
+            const response = await axios.get('http://localhost:5000/api/urls');
+            console.log('API Response:', response.data);
+            const data = response.data.data;
+            if (Array.isArray(data)) {
+                setLinks(data);
+            } else {
+                console.error('Fetched data is not an array', response.data);
             }
-        };
+        } catch (error) {
+            console.error('Error fetching links', error);
+        }
+    };
+
+    useEffect(() => {
+      
 
         fetchLinks();
     }, []);
@@ -63,15 +65,28 @@ const LinkList = () => {
         setEditingLink(link);
     };
 
-    const handleSave = async (updatedLink) => {
+    const handleSave = async () => {
         try {
-            await axios.put(`http://localhost:5000/api/urls/${updatedLink.url_id}`, updatedLink);
-            setLinks(links.map(link => (link.url_id === updatedLink.url_id ? updatedLink : link)));
+            if (!editingLink || !editingLink.url_id) {
+                throw new Error('Invalid link object or missing URL ID');
+            }
+
+            const payload = {
+                url_id: editingLink.url_id,
+                title: editingLink.title,
+                description: editingLink.description,
+                newUrl: editingLink.url
+            };
+
+            await axios.put(`http://localhost:5000/api/urls/${editingLink.url_id}`, payload);
             setEditingLink(null);
+            fetchLinks(); // Refresh all links
         } catch (error) {
             console.error('Error updating link', error);
         }
     };
+    
+    
 
     const handleChange = (e) => {
         const { name, value } = e.target;
@@ -81,77 +96,107 @@ const LinkList = () => {
         });
     };
 
+    const isSaveDisabled = () => {
+        const originalLink = links.find(link => link.url_id === editingLink.url_id);
+        return JSON.stringify(originalLink) === JSON.stringify(editingLink);
+    };
+
     return (
-        <div className='container flex items-center justify-center bg-gray-100'>
-            <div className='w-3/5 p-4 h-screen m-4 rounded-lg bg-white shadow-md'>
-                <div className="flex items-center mb-4">
-                    <h1 className='text-2xl font-bold'>Your links</h1>
-                </div>
-
-                <SearchForm searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
-
-                <ul className='mt-4'>
-                    {filteredLinks.length > 0 ? (
-                        filteredLinks.map((link) => (
-                            <li key={link.url_id} className='mb-4 flex items-center'>
-                                <img src={getRandomImage()} alt="Link thumbnail" className='w-16 h-16 rounded-lg mr-4' />
-                                {editingLink && editingLink.url_id === link.url_id ? (
-                                    <div>
-                                        <input
-                                            type="text"
-                                            name="title"
-                                            value={editingLink.title}
-                                            onChange={handleChange}
-                                            placeholder="Title"
-                                            className="mt-4 px-4 py-2 border rounded"
-                                        />
-                                        <input
-                                            type="text"
-                                            name="description"
-                                            value={editingLink.description}
-                                            onChange={handleChange}
-                                            placeholder="Description"
-                                            className="mt-4 px-4 py-2 border rounded"
-                                        />
-                                        <input
-                                            type="text"
-                                            name="url"
-                                            value={editingLink.url}
-                                            onChange={handleChange}
-                                            placeholder="URL"
-                                            className="mt-4 px-4 py-2 border rounded"
-                                        />
-                                        <div className='flex justify-center space-x-4'>
-                                            <button onClick={() => handleSave(editingLink)} className="mt-4 px-4 py-2 bg-green-600 text-white rounded">Save</button>
-                                            <button onClick={() => setEditingLink(null)} className="mt-4 px-4 py-2 bg-red-600 text-white rounded">Cancel</button>
-                                        </div>
-
-                                    </div>
-                                ) : (
-                                    <div className="flex justify-between items-center w-full">
-                                        <div className="flex-grow">
-                                            <h2 className='text-xl font-semibold'>{link.title}</h2>
-                                            <p>{link.description}</p>
-                                            <p>URL: <a href={link.url} className='text-blue-500'>{link.url}</a></p>
-                                        </div>
-                                        <DropdownMenu
-                                            onEdit={() => handleEdit(link)}
-                                            onDelete={() => handleDelete(link.url_id)}
-                                        />
-                                    </div>
-                                )}
-                            </li>
-                        ))
-                    ) : (
-                        <li>No links available</li>
-                    )}
-                </ul>
-
-
-                <button className="mt-4 px-4 py-2 bg-blue-600 text-white rounded"><Link to="/add-link" className="">Add New Link</Link></button>
-            </div>
-
+        <div className='container flex items-center justify-center bg-gray-200   py-8 px-4'>
+        <div className='w-full md:w-3/5 p-4 rounded-lg bg-white shadow-md'>
+          <div className='flex items-center mb-4'>
+            <h1 className='text-2xl font-bold'>Your links</h1>
+          </div>
+  
+          <SearchForm searchTerm={searchTerm} setSearchTerm={setSearchTerm} />
+  
+          <ul className='mt-4'>
+            {filteredLinks.length > 0 ? (
+              filteredLinks.map((link) => (
+                <li key={link.url_id} className='mb-4 flex flex-col md:flex-row items-center'>
+                  <img
+                    src={getRandomImage()}
+                    alt='Link thumbnail'
+                    className='w-16 h-16 rounded-lg mr-4 mb-4 md:mb-0'
+                  />
+                  {editingLink && editingLink.url_id === link.url_id ? (
+                    <div className='w-full'>
+                      <input
+                        type='text'
+                        name='title'
+                        value={editingLink.title}
+                        onChange={handleChange}
+                        placeholder='Title'
+                        className='mt-4 px-4 py-2 border rounded w-full'
+                      />
+                      <input
+                        type='text'
+                        name='description'
+                        value={editingLink.description}
+                        onChange={handleChange}
+                        placeholder='Description'
+                        className='mt-4 px-4 py-2 border rounded w-full'
+                      />
+                      <input
+                        type='text'
+                        name='url'
+                        value={editingLink.url}
+                        onChange={handleChange}
+                        placeholder='URL'
+                        className='mt-4 px-4 py-2 border rounded w-full'
+                      />
+                      <div className='flex justify-center space-x-4 mt-4'>
+                        <button
+                          onClick={handleSave}
+                          className={`px-4 py-2 ${
+                            isSaveDisabled() ? 'bg-gray-500 cursor-not-allowed' : 'bg-green-600 hover:bg-green-700'
+                          } text-white rounded`}
+                          disabled={isSaveDisabled()}
+                        >
+                          Save
+                        </button>
+                        <button onClick={() => setEditingLink(null)} className='px-4 py-2 bg-red-600 text-white rounded'>
+                          Cancel
+                        </button>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className='flex flex-col md:flex-row justify-between items-center w-full'>
+                      <div className='flex-grow'>
+                        <h2 className='text-xl font-semibold'>{link.title}</h2>
+                        <p>{link.description}</p>
+                        <p>
+                          URL:{' '}
+                          <a
+                            href={link.url}
+                            target='_blank'
+                            rel='noopener noreferrer'
+                            className='text-blue-500'
+                          >
+                            Click here
+                          </a>
+                        </p>
+                      </div>
+                      <DropdownMenu
+                        onEdit={() => handleEdit(link)}
+                        onDelete={() => handleDelete(link.url_id)}
+                      />
+                    </div>
+                  )}
+                </li>
+              ))
+            ) : (
+              <li>No links available</li>
+            )}
+          </ul>
+  
+          <button className='mt-4 px-4 py-2 bg-blue-600 text-white rounded'>
+            <Link to='/add-link' className=''>
+              Add New Link
+            </Link>
+          </button>
         </div>
+      </div>
     );
 };
 
